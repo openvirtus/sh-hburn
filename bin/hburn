@@ -1,0 +1,108 @@
+#!/bin/sh -e
+#L:
+#l:  Copyright (c) 2018 Openvirtus.com, http://openvirtus.com
+#L:
+#L:  Permission is hereby granted, free of charge, to any person obtaining
+#L:  a copy of this software and associated documentation files (the
+#L:  "Software"), to deal in the Software without restriction, including
+#L:  without limitation the rights to use, copy, modify, merge, publish,
+#L:  distribute, sublicense, and/or sell copies of the Software, and to
+#L:  permit persons to whom the Software is furnished to do so, subject to
+#L:  the following conditions:
+#L:
+#L:  The above copyright notice and this permission notice shall be
+#L:  included in all copies or substantial portions of the Software.
+#L:
+#L:  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+#L:  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#L:  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+#L:  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+#L:  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+#L:  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+#L:  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#L:
+#h: Usage: $0 [-lvD] [IMAGE DISK]
+#h:
+#h: This script extracts the image and burns it to disk. Supported
+#h: formats are: `.xz`, `.zip`. With `-D` it will print a directory
+#h: to where to save images. 
+hburn() {
+    ## Get options.
+    local OPTIND optopt= ops=
+    while getopts "lvD" optopt;do # OPTARG
+        local ops="${ops}${optopt}"
+        case $optopt in
+            D)  printf '%s\n' "${IMAGES_DIRECTORY}" ;;
+            v)  hburn_show_variables                ;;
+            l)  echo "<TODO>"                       ;;
+            \?) return 1                            ;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    ## Burn image.
+    if test -n "$1";then
+        hburn_extract "$@"
+    fi
+}
+hburn_show_variables() {
+    printf '%-20s : %s\n' PROG_XZCAT       "${PROG_XZCAT}"
+    printf '%-20s : %s\n' PROG_SUDO        "${PROG_SUDO}"
+    printf '%-20s : %s\n' PROG_DD          "${PROG_DD}"
+    printf '%-20s : %s\n' PROG_UNZIP       "${PROG_UNZIP}"
+    printf '%-20s : %s\n' IMAGES_DIRECTORY "${IMAGES_DIRECTORY}"
+}
+hburn_calc_variables() {
+    PROG_XZCAT="${PROG_XZCAT:-xzcat}"
+    PROG_SUDO="${PROG_SUDO:-sudo}"
+    PROG_DD="${PROG_DD:-dd}"
+    PROG_UNZIP="${PROG_UNZIP:-unzip}"
+    IMAGES_DIRECTORY="${IMAGES_DIRECTORY:-${HOME}/IMAGES}"
+}
+## ------------------------------------------------------------------------
+hburn_extract() { # FILE
+    local fr="$1" to="$2" progs= prog=
+    if test ! -n "${fr}";then
+        echo "hburn: error: Please specify a from device." >&2
+        return 1
+    fi
+    if test ! -n "${to}";then
+        echo "hburn: error: Please specify a to device."   >&2
+        return 1
+    fi
+    case "${fr}" in
+        *.zip) local progs="${PROG_UNZIP} ${PROG_DD}" ;;
+        *.xz)  local progs="${PROG_XZCAT} ${PROG_DD}" ;;
+        *)     local progs="${PROG_DD}"               ;;
+    esac
+    for prog in ${progs};do
+        if ! which "${prog}" >/dev/null 2>&1;then
+            echo "hburn: error: Can't find ${prog}." >&2
+            return 1
+        fi
+    done
+    ${PROG_SUDO} sync
+    case "${1}" in
+        *.zip)
+            "${PROG_UNZIP}" -p "${fr}" \
+                | ${PROG_SUDO} "${PROG_DD}" if="/dev/stdin" of="${to}" bs=1M status=progress;;
+        *.xz)
+            "${PROG_XZCAT}" "${fr}" \
+                | ${PROG_SUDO} "${PROG_DD}" if="/dev/stdin" of="${to}" bs=1M status=progress;;
+        *)  ${PROG_SUDO} "${PROG_DD}" if="${fr}" of="${to}" bs=1M status=progress;;
+    esac
+    ${PROG_SUDO} sync
+}
+
+
+
+## ------------------------------------------------------------------------
+hburn_calc_variables
+if test @"`basename "$0"`" = @"hburn";then
+    if test -n "$1";then
+        hburn "$@"
+    else
+        sed -n 's/^ *#h: \{0,1\}//p' "$0" | sed "s|\\\$0|`basename $0`|g"
+        echo ""
+        sed -n 's/^ *#l: \{0,2\}//p' "$0"
+    fi
+fi
