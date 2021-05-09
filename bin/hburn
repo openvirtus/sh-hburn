@@ -88,7 +88,8 @@ hburn_extract() { # FILE
         *.xz)
             "${PROG_XZCAT}" "${fr}" \
                 | ${PROG_SUDO} "${PROG_DD}" if="/dev/stdin" of="${to}" bs=1M status=progress;;
-        *)  ${PROG_SUDO} "${PROG_DD}" if="${fr}" of="${to}" bs=1M status=progress;;
+        *)  echo ${PROG_SUDO} "${PROG_DD}" if="${fr}" of="${to}" bs=1M status=progress
+            ${PROG_SUDO} "${PROG_DD}" if="${fr}" of="${to}" bs=1M status=progress;;
     esac
     ${PROG_SUDO} sync
 }
